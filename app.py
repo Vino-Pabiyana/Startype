@@ -1,7 +1,9 @@
+import streamlit as st
 import os
 import joblib
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
+
 
 @st.cache_resource
 def load_models():
@@ -28,3 +30,4 @@ def load_models():
         joblib.dump(spectral_encoder, "spectral_encoder.pkl")
 
     return model, scaler, color_encoder, spectral_encoder
+
