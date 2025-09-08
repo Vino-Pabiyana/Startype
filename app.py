@@ -1,57 +1,64 @@
 import streamlit as st
 import pandas as pd
-import joblib
+import numpy as np
+import pickle
 
-# Title
-st.title("Star Type Classification App ✨")
-st.write("Predict the type of a star based on its features.")
+# -------------------------------
+# Load Models and Encoders
+# -------------------------------
+@st.cache_resource
+def load_models():
+    with open("star_classifier_model.pkl", "rb") as f:
+        model = pickle.load(f)
+    with open("scaler.pkl", "rb") as f:
+        scaler = pickle.load(f)
+    with open("color_encoder.pkl", "rb") as f:
+        color_encoder = pickle.load(f)
+    with open("spectral_encoder.pkl", "rb") as f:
+        spectral_encoder = pickle.load(f)
+    return model, scaler, color_encoder, spectral_encoder
 
-# Load the trained model and scaler
-model = joblib.load("star_classifier_model.pkl")
-scaler = joblib.load("scaler.pkl")
+model, scaler, color_encoder, spectral_encoder = load_models()
 
-# Load label encoders if you used them for categorical features
-color_encoder = joblib.load("color_encoder.pkl")
-spectral_encoder = joblib.load("spectral_encoder.pkl")
+# -------------------------------
+# Streamlit UI
+# -------------------------------
+st.set_page_config(page_title="⭐ Star Type Classification", layout="centered")
 
-# Sidebar inputs
-st.sidebar.header("Input Star Features")
+st.title("⭐ Star Type Classification")
+st.write("This app predicts the type of a star based on its physical characteristics.")
 
-Temperature = st.sidebar.number_input("Temperature")
-L = st.sidebar.number_input("Luminosity (L)")
-R = st.sidebar.number_input("Radius (R)")
-A_M = st.sidebar.number_input("Absolute Magnitude (A_M)")
+# Sidebar Inputs
+st.sidebar.header("Star Features")
+temperature = st.sidebar.number_input("Temperature (K)", min_value=2000, max_value=40000, value=5778)
+luminosity = st.sidebar.number_input("Luminosity (L/Lo)", min_value=0.0001, max_value=100000.0, value=1.0, format="%.4f")
+radius = st.sidebar.number_input("Radius (R/Ro)", min_value=0.1, max_value=1000.0, value=1.0, format="%.4f")
+absolute_magnitude = st.sidebar.number_input("Absolute Magnitude (M)", min_value=-15.0, max_value=20.0, value=4.83)
 
-# For categorical features, use selectbox
-Color = st.sidebar.selectbox(
-    "Color",
-    options=color_encoder.classes_
-)
+color = st.sidebar.selectbox("Color", color_encoder.classes_)
+spectral_class = st.sidebar.selectbox("Spectral Class", spectral_encoder.classes_)
 
-Spectral_Class = st.sidebar.selectbox(
-    "Spectral Class",
-    options=spectral_encoder.classes_
-)
+# Prediction Button
+if st.sidebar.button("🔮 Predict Star Type"):
+    # Prepare data
+    input_data = pd.DataFrame({
+        "Temperature": [temperature],
+        "L": [luminosity],
+        "R": [radius],
+        "A_M": [absolute_magnitude],
+        "Color": [color],
+        "Spectral_Class": [spectral_class]
+    })
 
-# Create input DataFrame
-input_data = pd.DataFrame({
-    "Temperature": [Temperature],
-    "L": [L],
-    "R": [R],
-    "A_M": [A_M],
-    "Color": [Color],
-    "Spectral_Class": [Spectral_Class]
-})
+    # Preprocessing
+    input_data["Color"] = color_encoder.transform(input_data["Color"])
+    input_data["Spectral_Class"] = spectral_encoder.transform(input_data["Spectral_Class"])
 
-# Encode categorical columns
-input_data["Color"] = color_encoder.transform(input_data["Color"])
-input_data["Spectral_Class"] = spectral_encoder.transform(input_data["Spectral_Class"])
+    numeric_cols = ["Temperature", "L", "R", "A_M"]
+    input_data[numeric_cols] = scaler.transform(input_data[numeric_cols])
 
-# Scale numeric columns
-numeric_cols = ["Temperature", "L", "R", "A_M"]
-input_data[numeric_cols] = scaler.transform(input_data[numeric_cols])
+    # Prediction
+    prediction = model.predict(input_data)[0]
 
-# Predict button
-if st.button("Predict Star Type"):
-    prediction = model.predict(input_data)
-    st.success(f"Predicted Star Type: {prediction[0]}")
+    st.subheader("🌌 Prediction Result")
+    st.success(f"The predicted Star Type is: **{prediction}**")
