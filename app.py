@@ -8,8 +8,8 @@ import pickle
 # -------------------------------
 @st.cache_resource
 def load_models():
-    with open("star_classifier_model.pkl", "rb") as f:
-        model = pickle.load(f)
+    with open("models/star_classifier_model.pkl", "rb") as f:
+    model = pickle.load(f)
     with open("scaler.pkl", "rb") as f:
         scaler = pickle.load(f)
     with open("color_encoder.pkl", "rb") as f:
@@ -19,6 +19,8 @@ def load_models():
     return model, scaler, color_encoder, spectral_encoder
 
 model, scaler, color_encoder, spectral_encoder = load_models()
+import joblib
+model = joblib.load("star_classifier_model.pkl")
 
 # -------------------------------
 # Streamlit UI
@@ -62,3 +64,4 @@ if st.sidebar.button("🔮 Predict Star Type"):
 
     st.subheader("🌌 Prediction Result")
     st.success(f"The predicted Star Type is: **{prediction}**")
+
