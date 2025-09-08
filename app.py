@@ -3,9 +3,9 @@ import pandas as pd
 import numpy as np
 import joblib
 
-# -----------------------------
-# Load Models & Encoders
-# -----------------------------
+# ----------------------------
+# Load trained models & encoders
+# ----------------------------
 @st.cache_resource
 def load_models():
     model = joblib.load("star_classifier_model.pkl")
@@ -16,25 +16,27 @@ def load_models():
 
 model, scaler, color_encoder, spectral_encoder = load_models()
 
-# -----------------------------
-# Sidebar: Input Form
-# -----------------------------
-st.sidebar.header("🌟 Enter Star Details")
+# ----------------------------
+# Streamlit UI
+# ----------------------------
+st.title("⭐ Star Type Classification")
+st.markdown("Predict the **type of a star** based on its characteristics.")
 
-temperature = st.sidebar.number_input("Temperature (K)", min_value=2000, max_value=50000, step=1000)
-luminosity = st.sidebar.number_input("Luminosity (L/Lo)", min_value=0.0001, max_value=100000.0, step=0.1, format="%.4f")
-radius = st.sidebar.number_input("Radius (R/Ro)", min_value=0.01, max_value=1000.0, step=0.01, format="%.2f")
-absolute_magnitude = st.sidebar.number_input("Absolute Magnitude (M)", min_value=-15.0, max_value=20.0, step=0.1)
+# Sidebar inputs
+temperature = st.number_input("Temperature (K)", min_value=0, value=5000)
+luminosity = st.number_input("Luminosity (L/Lo)", min_value=0.0, value=1.0)
+radius = st.number_input("Radius (R/Ro)", min_value=0.0, value=1.0)
+absolute_magnitude = st.number_input("Absolute Magnitude (Mv)", value=5.0)
 
-color = st.sidebar.selectbox("Color", ["Red", "Blue", "White", "Yellow", "Orange", "Other"])
-spectral_class = st.sidebar.selectbox("Spectral Class", ["O", "B", "A", "F", "G", "K", "M"])
+color = st.selectbox("Color", color_encoder.classes_)
+spectral_class = st.selectbox("Spectral Class", spectral_encoder.classes_)
 
-# -----------------------------
-# Prediction Button
-# -----------------------------
-if st.sidebar.button("🔮 Predict Star Type"):
-    # Prepare data
-    input_data = pd.DataFrame({
+# ----------------------------
+# Prediction
+# ----------------------------
+if st.button("🔮 Predict Star Type"):
+    # Prepare input as DataFrame
+    input_df = pd.DataFrame({
         "Temperature": [temperature],
         "L": [luminosity],
         "R": [radius],
@@ -43,29 +45,15 @@ if st.sidebar.button("🔮 Predict Star Type"):
         "Spectral_Class": [spectral_class]
     })
 
-    # Encode categorical features
-    input_data["Color"] = color_encoder.transform(input_data["Color"])
-    input_data["Spectral_Class"] = spectral_encoder.transform(input_data["Spectral_Class"])
+    # Encode categorical variables
+    input_df["Color"] = color_encoder.transform(input_df["Color"])
+    input_df["Spectral_Class"] = spectral_encoder.transform(input_df["Spectral_Class"])
 
-    # Scale numeric features
+    # Scale numerical values
     numeric_cols = ["Temperature", "L", "R", "A_M"]
-    input_data[numeric_cols] = scaler.transform(input_data[numeric_cols])
+    input_df[numeric_cols] = scaler.transform(input_df[numeric_cols])
 
     # Predict
-    prediction = model.predict(input_data)[0]
+    prediction = model.predict(input_df)[0]
 
-    st.success(f"⭐ Predicted Star Type: **{prediction}**")
-
-# -----------------------------
-# Main Section
-# -----------------------------
-st.title("⭐ Star Type Classification App")
-st.write("""
-This app predicts the **type of a star** based on its properties:
-- Temperature  
-- Luminosity  
-- Radius  
-- Absolute Magnitude  
-- Color  
-- Spectral Class  
-""")
+    st.success(f"🌟 Predicted Star Type: **{prediction}**")
