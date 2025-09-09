@@ -1,87 +1,105 @@
-# ===============================
-# ⭐ Star Type Classification App
-# ===============================
-
 import streamlit as st
 import pandas as pd
-import numpy as np
-import os
 import joblib
-from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-# ----------------------------
-# Load Models & Encoders
-# ----------------------------
-@st.cache(allow_output_mutation=True)
+# -------------------------------
+# Load Models (cached)
+# -------------------------------
+@st.cache_resource
 def load_models():
-    # Load model
-    model_path = "star_classifier_model.pkl"
-    if os.path.exists(model_path):
-        model = joblib.load(model_path)
-    else:
-        st.error(f"Missing file: {model_path}")
-        st.stop()
-
-    # Load scaler
-    scaler_path = "scaler.pkl"
-    if os.path.exists(scaler_path):
-        scaler = joblib.load(scaler_path)
-    else:
-        st.error(f"Missing file: {scaler_path}")
-        st.stop()
-
-    # Load or generate Color encoder
-    color_path = "color_encoder.pkl"
-    if os.path.exists(color_path):
-        color_encoder = joblib.load(color_path)
-    else:
-        df = pd.read_csv("data/star_preprocessed.csv")
-        color_encoder = LabelEncoder()
-        color_encoder.fit(df["Color"])
-        joblib.dump(color_encoder, color_path)
-
-    # Load or generate Spectral_Class encoder
-    spectral_path = "spectral_encoder.pkl"
-    if os.path.exists(spectral_path):
-        spectral_encoder = joblib.load(spectral_path)
-    else:
-        df = pd.read_csv("data/star_preprocessed.csv")
-        spectral_encoder = LabelEncoder()
-        spectral_encoder.fit(df["Spectral_Class"])
-        joblib.dump(spectral_encoder, spectral_path)
-
+    model = joblib.load("star_classifier_model.pkl")
+    scaler = joblib.load("scaler.pkl")
+    color_encoder = joblib.load("color_encoder.pkl")
+    spectral_encoder = joblib.load("spectral_encoder.pkl")
     return model, scaler, color_encoder, spectral_encoder
 
 model, scaler, color_encoder, spectral_encoder = load_models()
 
-# ----------------------------
-# Streamlit UI
-# ----------------------------
-st.title("⭐ Star Type Classification")
-st.markdown("Predict the **type of a star** based on its features.")
+# -------------------------------
+# Page Config
+# -------------------------------
+st.set_page_config(
+    page_title="⭐ Star Type Classifier",
+    page_icon="✨",
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
 
+# -------------------------------
+# Custom Styling
+# -------------------------------
+st.markdown(
+    """
+    <style>
+    .main {
+        background-color: #0f172a;
+        color: white;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    h1, h2, h3 {
+        color: #facc15;
+    }
+    .stButton>button {
+        background-color: #facc15;
+        color: black;
+        font-weight: bold;
+        border-radius: 10px;
+        height: 3em;
+        width: 100%;
+    }
+    .stButton>button:hover {
+        background-color: #fde047;
+        color: black;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# -------------------------------
+# Title & Intro
+# -------------------------------
+st.title("⭐ Star Type Classification")
+st.write(
+    "A machine learning powered web app to classify **stars** into different types "
+    "based on their physical properties. 🔭✨"
+)
+
+st.divider()
+
+# -------------------------------
 # Sidebar Inputs
-st.sidebar.header("Enter Star Details")
-temperature = st.sidebar.number_input("Temperature (K)", min_value=0, value=5000)
+# -------------------------------
+st.sidebar.header("🔧 Input Star Details")
+
+temperature = st.sidebar.number_input("Temperature (K)", min_value=2000, max_value=40000, value=5778)
 luminosity = st.sidebar.number_input("Luminosity (L/Lo)", min_value=0.0, value=1.0)
 radius = st.sidebar.number_input("Radius (R/Ro)", min_value=0.0, value=1.0)
 absolute_magnitude = st.sidebar.number_input("Absolute Magnitude (Mv)", value=5.0)
-color = st.sidebar.selectbox("Color", color_encoder.classes_)
-spectral_class = st.sidebar.selectbox("Spectral Class", spectral_encoder.classes_)
 
-# ----------------------------
-# Prediction
-# ----------------------------
-if st.button("🔮 Predict Star Type"):
-    # Prepare input as DataFrame
-    input_df = pd.DataFrame({
-        "Temperature": [temperature],
-        "L": [luminosity],
-        "R": [radius],
-        "A_M": [absolute_magnitude],
-        "Color": [color],
-        "Spectral_Class": [spectral_class]
-    })
+color = st.sidebar.selectbox(
+    "Color",
+    color_encoder.classes_.tolist()
+)
+
+spectral_class = st.sidebar.selectbox(
+    "Spectral Class",
+    spectral_encoder.classes_.tolist()
+)
+
+# -------------------------------
+# Prediction Button
+# -------------------------------
+if st.sidebar.button("🔮 Predict Star Type"):
+    # Prepare input
+    input_df = pd.DataFrame([{
+        "Temperature": temperature,
+        "L": luminosity,
+        "R": radius,
+        "A_M": absolute_magnitude,
+        "Color": color,
+        "Spectral_Class": spectral_class
+    }])
 
     # Encode categorical features
     input_df["Color"] = color_encoder.transform(input_df["Color"])
@@ -91,18 +109,33 @@ if st.button("🔮 Predict Star Type"):
     numeric_cols = ["Temperature", "L", "R", "A_M"]
     input_df[numeric_cols] = scaler.transform(input_df[numeric_cols])
 
-    # Make prediction
+    # Predict
     prediction = model.predict(input_df)[0]
 
-    # Optional: Map numeric prediction to star type name
+    # Star type mapping
     star_types = {
-        0: "Brown Dwarf",
-        1: "Red Dwarf",
-        2: "White Dwarf",
-        3: "Main Sequence",
-        4: "Supergiant",
-        5: "Hypergiant"
+        0: "Red Dwarf 🌟",
+        1: "Brown Dwarf 🟤",
+        2: "White Dwarf ⚪",
+        3: "Main Sequence 🌞",
+        4: "Supergiant 💫",
+        5: "Hypergiant 🌌"
     }
-    predicted_name = star_types.get(prediction, str(prediction))
 
-    st.success(f"🌟 Predicted Star Type: **{predicted_name}**")
+    st.subheader("🔭 Prediction Result")
+    st.success(f"The predicted **Star Type** is: **{star_types[prediction]}**")
+
+    st.balloons()
+
+# -------------------------------
+# Footer
+# -------------------------------
+st.divider()
+st.markdown(
+    """
+    💡 **About this App**  
+    This project demonstrates how machine learning can classify stars into types
+    using their **temperature, luminosity, radius, absolute magnitude, color, and spectral class**.  
+    Built with ❤️ using Streamlit.
+    """
+)
