@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import base64
 
 # -------------------------------
 # Load Models (cached)
@@ -21,7 +22,7 @@ model, scaler, color_encoder, spectral_encoder = load_models()
 st.set_page_config(
     page_title="⭐ Star Type Classifier",
     page_icon="✨",
-    layout="centered",
+    layout="wide",
     initial_sidebar_state="expanded"
 )
 
@@ -50,6 +51,18 @@ st.markdown(
     .stButton>button:hover {
         background-color: #fde047;
         color: black;
+    }
+    /* Falling stars animation */
+    @keyframes fall {
+        0% {transform: translateY(-100vh);}
+        100% {transform: translateY(100vh);}
+    }
+    .falling-star {
+        position: fixed;
+        top: 0;
+        left: calc(100% * var(--pos));
+        font-size: 25px;
+        animation: fall linear infinite;
     }
     </style>
     """,
@@ -88,10 +101,29 @@ spectral_class = st.sidebar.selectbox(
 )
 
 # -------------------------------
-# Prediction Button
+# Prediction Function
+# -------------------------------
+def predict_star(input_df):
+    input_df["Color"] = color_encoder.transform(input_df["Color"])
+    input_df["Spectral_Class"] = spectral_encoder.transform(input_df["Spectral_Class"])
+    numeric_cols = ["Temperature", "L", "R", "A_M"]
+    input_df[numeric_cols] = scaler.transform(input_df[numeric_cols])
+    prediction = model.predict(input_df)
+    return prediction
+
+star_types = {
+    0: "Red Dwarf 🌟",
+    1: "Brown Dwarf 🟤",
+    2: "White Dwarf ⚪",
+    3: "Main Sequence 🌞",
+    4: "Supergiant 💫",
+    5: "Hypergiant 🌌"
+}
+
+# -------------------------------
+# Single Prediction
 # -------------------------------
 if st.sidebar.button("🔮 Predict Star Type"):
-    # Prepare input
     input_df = pd.DataFrame([{
         "Temperature": temperature,
         "L": luminosity,
@@ -100,32 +132,44 @@ if st.sidebar.button("🔮 Predict Star Type"):
         "Color": color,
         "Spectral_Class": spectral_class
     }])
-
-    # Encode categorical features
-    input_df["Color"] = color_encoder.transform(input_df["Color"])
-    input_df["Spectral_Class"] = spectral_encoder.transform(input_df["Spectral_Class"])
-
-    # Scale numeric features
-    numeric_cols = ["Temperature", "L", "R", "A_M"]
-    input_df[numeric_cols] = scaler.transform(input_df[numeric_cols])
-
-    # Predict
-    prediction = model.predict(input_df)[0]
-
-    # Star type mapping
-    star_types = {
-        0: "Red Dwarf 🌟",
-        1: "Brown Dwarf 🟤",
-        2: "White Dwarf ⚪",
-        3: "Main Sequence 🌞",
-        4: "Supergiant 💫",
-        5: "Hypergiant 🌌"
-    }
-
+    prediction = predict_star(input_df)[0]
     st.subheader("🔭 Prediction Result")
     st.success(f"The predicted **Star Type** is: **{star_types[prediction]}**")
 
-    st.balloons()
+    # Falling stars animation
+    falling_stars = "".join(
+        f'<div class="falling-star" style="--pos:{i/10}; animation-duration:{3+i%3}s;">✨</div>'
+        for i in range(10)
+    )
+    st.markdown(falling_stars, unsafe_allow_html=True)
+
+# -------------------------------
+# Batch Prediction via CSV Upload
+# -------------------------------
+st.divider()
+st.subheader("📂 Batch Prediction (Upload CSV)")
+
+uploaded_file = st.file_uploader("Upload CSV with star data", type=["csv"])
+
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
+
+    st.write("📄 Uploaded Data Preview:")
+    st.dataframe(df.head())
+
+    if st.button("🚀 Run Batch Prediction"):
+        batch_df = df.copy()
+        predictions = predict_star(batch_df)
+        df["Predicted_Star_Type"] = [star_types[p] for p in predictions]
+
+        st.success("✅ Batch Prediction Completed")
+        st.dataframe(df)
+
+        # Allow download
+        csv = df.to_csv(index=False).encode("utf-8")
+        b64 = base64.b64encode(csv).decode()
+        href = f'<a href="data:file/csv;base64,{b64}" download="batch_star_predictions.csv">📥 Download Results</a>'
+        st.markdown(href, unsafe_allow_html=True)
 
 # -------------------------------
 # Footer
